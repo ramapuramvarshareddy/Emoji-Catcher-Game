@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Emoji Catcher Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: linear-gradient(#d0f0ff, #f5faff);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #scoreboard {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 24px;
+      color: #333;
+      background-color: rgba(255, 255, 255, 0.8);
+      padding: 10px 15px;
+      border-radius: 12px;
+      display: none;
+    }
+
+    #playBtn, #playAgainBtn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      padding: 20px 40px;
+      background-color: #ff9800;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    #playBtn:hover, #playAgainBtn:hover {
+      background-color: #e68a00;
+      transform: translate(-50%, -50%) scale(1.05);
+    }
+
+    #playAgainBtn {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<div id="scoreboard">
+  Score: 0<br>
+  Best: 0<br>
+  Lives: ❤❤❤<br>
+  Time: 30s
+</div>
+<button id="playBtn">🎮 Play Game</button>
+<button id="playAgainBtn">🔁 Play Again</button>
+
+<audio id="catchSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
+<audio id="bombSound" src="https://www.soundjay.com/human/fart-01.mp3" preload="auto"></audio>
+<audio id="bgMusic" src="https://www.bensound.com/bensound-music/bensound-creativeminds.mp3" loop preload="auto"></audio>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const playBtn = document.getElementById('playBtn');
+const playAgainBtn = document.getElementById('playAgainBtn');
+const scoreboard = document.getElementById('scoreboard');
+const catchSound = document.getElementById('catchSound');
+const bombSound = document.getElementById('bombSound');
+const bgMusic = document.getElementById('bgMusic');
+
+let basketX = canvas.width / 2;
+let basketWidth = 100;
+let emojis = [];
+let bombs = [];
+let score = 0;
+let bestScore = 0;
+let lives = 3;
+let timeLeft = 30;
+let gameOver = true;
+let emojiList = ['🍎', '🍇', '🍔', '🍕', '🎈', '🐶', '🐱'];
+let emojiInterval, timerInterval;
+
+function spawnEmojiOrBomb() {
+  if (gameOver) return;
+  if (Math.random() < 0.8) {
+    emojis.push({
+      x: Math.random() * (canvas.width - 30),
+      y: -30,
+      speed: 2 + Math.random() * 3,
+      symbol: emojiList[Math.floor(Math.random() * emojiList.length)],
+      type: 'emoji'
+    });
+  } else {
+    bombs.push({
+      x: Math.random() * (canvas.width - 30),
+      y: -30,
+      speed: 3 + Math.random() * 3,
+      symbol: '💣',
+      type: 'bomb'
+    });
+  }
+}
+
+function drawBasket() {
+  ctx.font = "50px Arial";
+  ctx.fillText('🧺', basketX - 25, canvas.height - 40);
+}
+
+function drawItems(items) {
+  for (let item of items) {
+    ctx.font = "40px Arial";
+    ctx.fillText(item.symbol, item.x, item.y);
+  }
+}
+
+function updateItems(items) {
+  for (let item of items) item.y += item.speed;
+  return items.filter(item => item.y < canvas.height + 40);
+}
+
+function checkCatch() {
+  for (let i = 0; i < emojis.length; i++) {
+    const e = emojis[i];
+    if (e.y > canvas.height - 80 && e.x > basketX - basketWidth / 2 && e.x < basketX + basketWidth / 2) {
+      emojis.splice(i, 1);
+      score++;
+      if (score > bestScore) bestScore = score;
+      catchSound.currentTime = 0;
+      catchSound.play();
+      updateScoreboard();
+      break;
+    }
+  }
+
+  for (let i = 0; i < bombs.length; i++) {
+    const b = bombs[i];
+    if (b.y > canvas.height - 80 && b.x > basketX - basketWidth / 2 && b.x < basketX + basketWidth / 2) {
+      bombs.splice(i, 1);
+      score = Math.max(0, score - 2);
+      lives--;
+      bombSound.currentTime = 0;
+      bombSound.play();
+      shakeCanvas();
+      updateScoreboard();
+      if (lives <= 0) endGame();
+      break;
+    }
+  }
+}
+
+function updateScoreboard() {
+  scoreboard.innerHTML = `Score: ${score}<br>Best: ${bestScore}<br>Lives: ${'❤'.repeat(lives)}<br>Time: ${timeLeft}s`;
+}
+
+function shakeCanvas() {
+  let shakeTime = 500;
+  let start = Date.now();
+  let interval = setInterval(() => {
+    let elapsed = Date.now() - start;
+    if (elapsed > shakeTime) {
+      clearInterval(interval);
+      canvas.style.transform = '';
+    } else {
+      canvas.style.transform = `translate(${(Math.random() - 0.5) * 10}px, ${(Math.random() - 0.5) * 10}px)`;
+    }
+  }, 50);
+}
+
+function gameLoop() {
+  if (gameOver) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBasket();
+  drawItems(emojis);
+  drawItems(bombs);
+  emojis = updateItems(emojis);
+  bombs = updateItems(bombs);
+  checkCatch();
+  requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+  score = 0;
+  lives = 3;
+  timeLeft = 30;
+  emojis = [];
+  bombs = [];
+  gameOver = false;
+  updateScoreboard();
+  scoreboard.style.display = 'block';
+  playBtn.style.display = 'none';
+  playAgainBtn.style.display = 'none';
+
+  bgMusic.currentTime = 0;
+  bgMusic.play();
+
+  emojiInterval = setInterval(spawnEmojiOrBomb, 800);
+  timerInterval = setInterval(() => {
+    if (!gameOver) {
+      timeLeft--;
+      updateScoreboard();
+      if (timeLeft <= 0) endGame();
+    }
+  }, 1000);
+
+  gameLoop();
+}
+
+function endGame() {
+  gameOver = true;
+  clearInterval(emojiInterval);
+  clearInterval(timerInterval);
+  bgMusic.pause();
+  playAgainBtn.style.display = 'block';
+}
+
+playBtn.addEventListener('click', startGame);
+playAgainBtn.addEventListener('click', startGame);
+
+const hands = new Hands({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+hands.setOptions({
+  maxNumHands: 1,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
+});
+hands.onResults(results => {
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    const x = results.multiHandLandmarks[0][9].x;
+    basketX = (1 - x) * canvas.width;
+  }
+});
+const videoElement = document.createElement('video');
+videoElement.style.display = 'none';
+document.body.appendChild(videoElement);
+const camera = new Camera(videoElement, {
+  onFrame: async () => await hands.send({ image: videoElement }),
+  width: 640,
+  height: 480
+});
+camera.start();
+</script>
+
+</body>
+</html>

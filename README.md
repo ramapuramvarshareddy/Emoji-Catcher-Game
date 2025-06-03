@@ -1,5 +1,6 @@
 # Emoji-Catcher-Game
 A fun hand-controlled browser game where you catch emojis and avoid bombs using a virtual basket. No keyboard or mouse needed — just your hand! 🖐️🧺
+
 🚀 Features
 🖐️ Hand Tracking: Powered by MediaPipe Hands to control the basket with your real-time hand gestures.
 
@@ -14,6 +15,7 @@ A fun hand-controlled browser game where you catch emojis and avoid bombs using 
 🔊 Sound Effects & Music: Catch, bomb, and background sounds enhance the fun.
 
 🎮 Play Again Button: Quickly restart the game after it's over.
+
 🛠️ Tech Stack
 HTML5 Canvas – for rendering game graphics
 
